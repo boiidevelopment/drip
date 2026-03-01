@@ -1,3 +1,5 @@
+<img width="1282" height="752" alt="image" src="https://github.com/user-attachments/assets/652c4c31-a9f7-4f7e-ac13-4d252148e619" />
+
 # DRIP - Drawn Interface Pack
 
 A lightweight collection of standalone UI components for FiveM.
