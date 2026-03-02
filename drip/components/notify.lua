@@ -1,14 +1,14 @@
 --[[
 --------------------------------------------------
 
-This file is part of GRAFT.
+This file is part of DRIP.
 You are free to use these files within your own resources.
 Please retain the original credit and attached MIT license.
 Support honest development.
 
 Author: Case @ BOII Development
-License: MIT (https://github.com/boiidevelopment/graft/blob/main/LICENSE)
-GitHub: https://github.com/boiidevelopment/graft
+License: MIT (https://github.com/boiidevelopment/drip/blob/main/LICENSE)
+GitHub: https://github.com/boiidevelopment/drip
 
 --------------------------------------------------
 ]]
@@ -153,7 +153,7 @@ end
 
 --- @section API
 
-function send_notification(data)
+local function send_notification(data)
     _queue[#_queue + 1] = Notify.new(data)
 end
 

@@ -304,7 +304,7 @@ end)
 
 --- @section API
 
-function open_input(data)
+local function open_input(data)
     _active = Input.new(data)
     _visible = true
 end
@@ -312,7 +312,7 @@ end
 exports("open_input", open_input)
 if drip then drip.open_input = open_input end
 
-function close_input()
+local function close_input()
     _visible = false
     _active = nil
 end
@@ -320,35 +320,9 @@ end
 exports("close_input", close_input)
 if drip then drip.close_input = close_input end
 
-function is_input_open()
+local function is_input_open()
     return _visible
 end
 
 exports("is_input_open", is_input_open)
 if drip then drip.is_input_open = is_input_open end
-
---- @section Test Command
-
-RegisterCommand("drip:input", function()
-    if is_input_open() then close_input() return end
-
-    open_input({
-        title = "Give Item",
-        style = {width = 0.22},
-        inputs = {
-            {id = "item_id", type = "select", label = "Item", options = {
-                {label = "Water", value = "water"},
-                {label = "Burger", value = "burger"},
-                {label = "Bandage", value = "bandage"},
-            }},
-            {id = "amount", type = "number", label = "Amount", min = 1, max = 100, step = 1, default = 1},
-            {id = "quality", type = "number", label = "Quality", min = 0, max = 100, step = 5, default = 100},
-        },
-        on_confirm = function(values)
-            print("item_id:", values.item_id, "amount:", values.amount, "quality:", values.quality)
-        end,
-        on_cancel = function()
-            print("cancelled")
-        end
-    })
-end, false)

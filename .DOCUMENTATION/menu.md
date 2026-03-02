@@ -11,6 +11,8 @@ Data-driven menu system. Supports infinite depth submenus, multiple simultaneous
 | `open_menu(data)` | Open a menu instance |
 | `close_menu(id?)` | Close by id, or close all if no id passed |
 | `is_menu_open(id?)` | Returns `true` if instance is open, or any menu if no id passed |
+| `update_menu(id, menu_key, data)` | Update a single menu's items within an existing instance by key |
+| `update_menus(id, menus)` | Batch update multiple menus within an existing instance, preserving cursor position |
 
 ### Exports
 ```lua

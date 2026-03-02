@@ -146,7 +146,7 @@ end)
 
 --- @section API
 
-function show_panel(data)
+local function show_panel(data)
     if not data.id then return end
     _panels[data.id] = Panel.new(data)
 end
@@ -154,14 +154,14 @@ end
 exports("show_panel", show_panel)
 if drip then drip.show_panel = show_panel end
 
-function hide_panel(id)
+local function hide_panel(id)
     _panels[id] = nil
 end
 
 exports("hide_panel", hide_panel)
 if drip then drip.hide_panel = hide_panel end
 
-function update_panel(data)
+local function update_panel(data)
     if not data.id or not _panels[data.id] then return end
     _panels[data.id] = Panel.new(data)
 end
@@ -169,7 +169,7 @@ end
 exports("update_panel", update_panel)
 if drip then drip.update_panel = update_panel end
 
-function is_panel_visible(id)
+local function is_panel_visible(id)
     return _panels[id] ~= nil
 end
 

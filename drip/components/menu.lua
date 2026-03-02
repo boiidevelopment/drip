@@ -42,6 +42,7 @@ local DEFAULT_STYLE = {
     text_font = 0,
     text_scale = 0.30,
     line_h = 0.024,
+    wrap = 50,
     colours = {
         bg = {0, 0, 0, 180},
         bg_inner = {255, 255, 255, 15},
@@ -76,6 +77,21 @@ end
 local function col(colours, key, alpha_override)
     local c = colours[key]
     return c[1], c[2], c[3], alpha_override or c[4]
+end
+
+local function wrap_text(str, limit)
+    local lines = {}
+    local current = ""
+    for word in str:gmatch("%S+") do
+        if #current + #word + 1 > limit then
+            lines[#lines + 1] = current
+            current = word
+        else
+            current = current == "" and word or current .. " " .. word
+        end
+    end
+    if current ~= "" then lines[#lines + 1] = current end
+    return lines
 end
 
 local function draw_text(str, x, y, font, scale, r, g, b, a, centre, shadow)
@@ -244,7 +260,22 @@ function Instance:draw(focused)
     local has_desc = sel and sel.desc and sel.type ~= "separator"
     local desc_h = has_desc and (self.line_h + self.pad_y) or 0
     local scroll_h = has_scroll and self.line_h or 0
-    local box_h = self.header_height + (self.pad_y * 2) + (vis * self.line_h) + scroll_h + desc_h + self.pad_y
+    local wrap_limit = self.wrap or DEFAULT_STYLE.wrap or 28
+    local item_layouts = {}
+    local total_h = 0
+    for i = 1, vis do
+        local idx = menu.scroll + i
+        local item = menu.items[idx]
+        if not item then break end
+        if item.type == "separator" then
+            item_layouts[i] = { item = item, idx = idx, lines = {item.label or ""}, h = self.line_h }
+        else
+            local lines = wrap_text(item.label or "", wrap_limit)
+            item_layouts[i] = { item = item, idx = idx, lines = lines, h = #lines * self.line_h }
+        end
+        total_h = total_h + item_layouts[i].h
+    end
+    local box_h = self.header_height + (self.pad_y * 2) + total_h + scroll_h + desc_h + self.pad_y
     local cy = y + box_h / 2
     local bg_a = focused and 180 or 100
     DrawRect(cx, cy, w, box_h, col(c, "bg", bg_a))
@@ -258,29 +289,29 @@ function Instance:draw(focused)
         draw_text("<", x + self.pad_x, hcy - 0.0125, self.text_font, self.text_scale, col(c, "accent"))
     end
     draw_text(menu.title, cx, hcy - 0.0125, self.header_font, self.header_scale, col(c, "header_text"), nil, nil, nil, true)
-    local items_y = y + self.header_height + self.pad_y
-    for i = 1, vis do
-        local idx = menu.scroll + i
-        local item = menu.items[idx]
-        if not item then break end
-        local iy = items_y + (i - 1) * self.line_h
+    local cur_y = y + self.header_height + self.pad_y
+    for _, layout in ipairs(item_layouts) do
+        local item = layout.item
+        local idx = layout.idx
         local is_sel = focused and idx == menu.index
-        local row_cy = iy + self.line_h / 2
+        local row_cy = cur_y + layout.h / 2
         if item.type == "separator" then
             DrawRect(cx + 0.001, row_cy, w - self.pad_x * 10, 0.002, col(c, "separator"))
             if item.label and item.label ~= "" then
-                draw_text(item.label, x + self.pad_x, iy + 0.002, self.text_font, 0.24, col(c, "text_dim"))
+                draw_text(item.label, x + self.pad_x, cur_y + 0.002, self.text_font, 0.24, col(c, "text_dim"))
             end
         else
             if is_sel then
-                DrawRect(cx, row_cy, w, self.line_h, col(c, "highlight"))
+                DrawRect(cx, row_cy, w, layout.h, col(c, "highlight"))
             end
             local tc = is_sel and "text_sel" or "text"
-            draw_text(item.label or "", x + self.pad_x, iy - 0.001, self.text_font, self.text_scale, col(c, tc))
+            for li, line in ipairs(layout.lines) do
+                draw_text(line, x + self.pad_x, cur_y + ((li - 1) * self.line_h) - 0.001, self.text_font, self.text_scale, col(c, tc))
+            end
             local rx = x + w - self.pad_x
             if item.type == "toggle" then
                 local ck = item.value and "toggle_on" or "toggle_off"
-                draw_text(item.value and "ON" or "OFF", rx - 0.0175, iy - 0.001, self.text_font, self.text_scale, col(c, ck))
+                draw_text(item.value and "ON" or "OFF", rx - 0.0175, cur_y - 0.001, self.text_font, self.text_scale, col(c, ck))
             elseif item.type == "slider" then
                 local pct = (item.value - item.min) / (item.max - item.min)
                 local tw = 0.07
@@ -290,11 +321,12 @@ function Instance:draw(focused)
                     local fw = tw * pct
                     DrawRect(tx + fw / 2, row_cy, fw, 0.006, col(c, "accent"))
                 end
-                draw_text(tostring(item.value), tx - 0.019, iy - 0.001, self.text_font, self.text_scale, col(c, "text"))
+                draw_text(tostring(item.value), tx - 0.019, cur_y - 0.001, self.text_font, self.text_scale, col(c, "text"))
             elseif item.type == "submenu" then
-                draw_text(">>", rx - 0.012, iy - 0.001, self.text_font, self.text_scale, col(c, "accent"))
+                draw_text(">>", rx - 0.012, cur_y - 0.001, self.text_font, self.text_scale, col(c, "accent"))
             end
         end
+        cur_y = cur_y + layout.h
     end
     if has_desc then
         local dy = y + box_h - desc_h - self.pad_y / 2
@@ -363,12 +395,12 @@ end
 
 --- @section API
 
-function open_menu(data)
+local function open_menu(data)
     if not data.id then return end
     local inst = Instance.new(data)
     _instances[data.id] = inst
     _order[#_order + 1] = data.id
-    if not _focused then _focused = data.id end
+    _focused = data.id
     if not _open then
         _open = true
         start_threads()
@@ -378,7 +410,7 @@ end
 exports("open_menu", open_menu)
 if drip then drip.open_menu = open_menu end
 
-function close_menu(id)
+local function close_menu(id)
     if id then
         local inst = _instances[id]
         if inst then inst:close() end
@@ -392,6 +424,39 @@ end
 
 exports("close_menu", close_menu)
 if drip then drip.close_menu = close_menu end
+
+local function update_menu(id, menu_key, data)
+    local inst = _instances[id]
+    if not inst then return end
+    if not inst.menus[menu_key] then return end
+    inst.menus[menu_key].items = data.items
+    if inst.active_key == menu_key then
+        local prev_index = inst.active.index
+        inst.active = Menu.new(inst.menus[menu_key])
+        inst.active.index = math.min(prev_index, #inst.active.items)
+        inst.active:clamp_scroll(inst.max_vis)
+    end
+end
+
+exports("update_menu", update_menu)
+if drip then drip.update_menu = update_menu end
+
+function update_menus(id, menus)
+    local inst = _instances[id]
+    if not inst then return end
+    for key, menu in pairs(menus) do
+        inst.menus[key] = menu
+    end
+    if inst.active_key and inst.menus[inst.active_key] then
+        local prev_index = inst.active.index
+        inst.active = Menu.new(inst.menus[inst.active_key])
+        inst.active.index = math.min(prev_index, #inst.active.items)
+        inst.active:clamp_scroll(inst.max_vis)
+    end
+end
+
+exports("update_menus", update_menus)
+if drip then drip.update_menus = update_menus end
 
 function is_menu_open(id)
     if id then return _instances[id] ~= nil end
