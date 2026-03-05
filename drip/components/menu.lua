@@ -21,44 +21,13 @@ if IsDuplicityVersion() then return end
 
 --- @section Constants
 
-local KEY_UP = 172
-local KEY_DOWN = 173
-local KEY_LEFT = 174
-local KEY_RIGHT = 175
-local KEY_ENTER = 191
-local KEY_BACK = 177
-local KEY_TAB = 37
-
-local DEFAULT_STYLE = {
-    x = 0.015,
-    y = 0.0275,
-    width = 0.22,
-    pad_x = 0.008,
-    pad_y = 0.006,
-    max_vis = 10,
-    header_font = 4,
-    header_scale = 0.34,
-    header_height = 0.030,
-    text_font = 0,
-    text_scale = 0.30,
-    line_h = 0.024,
-    wrap = 50,
-    colours = {
-        bg = {0, 0, 0, 180},
-        bg_inner = {255, 255, 255, 15},
-        header = {20, 20, 20, 255},
-        header_text = {255, 255, 255, 255},
-        text = {220, 220, 220, 220},
-        text_sel = {255, 255, 255, 255},
-        text_dim = {160, 160, 160, 200},
-        highlight = {255, 255, 255, 30},
-        accent = {228, 173, 41, 255},
-        toggle_on = {80, 200, 120, 255},
-        toggle_off = {200, 80, 80, 255},
-        slider_bg = {60, 60, 60, 200},
-        separator = {255, 255, 255, 30},
-    }
-}
+local KEY_UP = drip.keycodes[drip.keys.menu.up] or 172
+local KEY_DOWN = drip.keycodes[drip.keys.menu.down] or 173
+local KEY_LEFT = drip.keycodes[drip.keys.menu.left] or 174
+local KEY_RIGHT = drip.keycodes[drip.keys.menu.right] or 175
+local KEY_ENTER = drip.keycodes[drip.keys.menu.confirm] or 191
+local KEY_BACK = drip.keycodes[drip.keys.menu.back] or 177
+local KEY_TAB = drip.keycodes[drip.keys.menu.switch_menu] or 37
 
 --- @section State
 
@@ -66,44 +35,7 @@ local _instances = {}
 local _order = {}
 local _focused = nil
 local _open = false
-
---- @section Helpers
-
-local function resolve(style, key)
-    if style and style[key] ~= nil then return style[key] end
-    return DEFAULT_STYLE[key]
-end
-
-local function col(colours, key, alpha_override)
-    local c = colours[key]
-    return c[1], c[2], c[3], alpha_override or c[4]
-end
-
-local function wrap_text(str, limit)
-    local lines = {}
-    local current = ""
-    for word in str:gmatch("%S+") do
-        if #current + #word + 1 > limit then
-            lines[#lines + 1] = current
-            current = word
-        else
-            current = current == "" and word or current .. " " .. word
-        end
-    end
-    if current ~= "" then lines[#lines + 1] = current end
-    return lines
-end
-
-local function draw_text(str, x, y, font, scale, r, g, b, a, centre, shadow)
-    SetTextFont(font or DEFAULT_STYLE.text_font)
-    SetTextScale(scale or DEFAULT_STYLE.text_scale, scale or DEFAULT_STYLE.text_scale)
-    SetTextColour(r or 255, g or 255, b or 255, a or 255)
-    SetTextCentre(centre and 1 or 0)
-    if shadow then SetTextDropShadow() end
-    SetTextEntry("STRING")
-    AddTextComponentString(str)
-    DrawText(x, y)
-end
+local _busy = false
 
 --- @class Menu
 
@@ -161,7 +93,7 @@ Instance.__index = Instance
 function Instance.new(data)
     local style = data.style or {}
     local colours = {}
-    for k, v in pairs(DEFAULT_STYLE.colours) do colours[k] = v end
+    for k, v in pairs(drip.style.colours) do colours[k] = v end
     if style.colours then
         for k, v in pairs(style.colours) do colours[k] = v end
     end
@@ -171,18 +103,18 @@ function Instance.new(data)
         menus = data.menus,
         active_key = data.root,
         active = nil,
-        x = resolve(style, "x"),
-        y = resolve(style, "y"),
-        width = resolve(style, "width"),
-        pad_x = resolve(style, "pad_x"),
-        pad_y = resolve(style, "pad_y"),
-        max_vis = resolve(style, "max_vis"),
-        header_font = resolve(style, "header_font"),
-        header_scale = resolve(style, "header_scale"),
-        header_height = resolve(style, "header_height"),
-        text_font = resolve(style, "text_font"),
-        text_scale = resolve(style, "text_scale"),
-        line_h = resolve(style, "line_h"),
+        x = drip.resolve_style(style, "x"),
+        y = drip.resolve_style(style, "y"),
+        width = drip.resolve_style(style, "width"),
+        pad_x = drip.resolve_style(style, "pad_x"),
+        pad_y = drip.resolve_style(style, "pad_y"),
+        max_vis = drip.resolve_style(style, "max_vis"),
+        header_font = drip.resolve_style(style, "header_font"),
+        header_scale = drip.resolve_style(style, "header_scale"),
+        header_height = drip.resolve_style(style, "header_height"),
+        text_font = drip.resolve_style(style, "text_font"),
+        text_scale = drip.resolve_style(style, "text_scale"),
+        line_h = drip.resolve_style(style, "line_h"),
         colours = colours,
     }, Instance)
     inst.active = Menu.new(data.menus[data.root])
@@ -260,7 +192,7 @@ function Instance:draw(focused)
     local has_desc = sel and sel.desc and sel.type ~= "separator"
     local desc_h = has_desc and (self.line_h + self.pad_y) or 0
     local scroll_h = has_scroll and self.line_h or 0
-    local wrap_limit = self.wrap or DEFAULT_STYLE.wrap or 28
+    local wrap_limit = self.wrap or drip.style.wrap or 28
     local item_layouts = {}
     local total_h = 0
     for i = 1, vis do
@@ -270,7 +202,7 @@ function Instance:draw(focused)
         if item.type == "separator" then
             item_layouts[i] = { item = item, idx = idx, lines = {item.label or ""}, h = self.line_h }
         else
-            local lines = wrap_text(item.label or "", wrap_limit)
+            local lines = drip.wrap_text(item.label or "", wrap_limit)
             item_layouts[i] = { item = item, idx = idx, lines = lines, h = #lines * self.line_h }
         end
         total_h = total_h + item_layouts[i].h
@@ -278,17 +210,17 @@ function Instance:draw(focused)
     local box_h = self.header_height + (self.pad_y * 2) + total_h + scroll_h + desc_h + self.pad_y
     local cy = y + box_h / 2
     local bg_a = focused and 180 or 100
-    DrawRect(cx, cy, w, box_h, col(c, "bg", bg_a))
-    DrawRect(cx, cy, w - 0.001, box_h - 0.001, col(c, "bg_inner"))
+    DrawRect(cx, cy, w, box_h, drip.colour(c, "bg", bg_a))
+    DrawRect(cx, cy, w - 0.001, box_h - 0.001, drip.colour(c, "bg_inner"))
     local hcy = y + self.header_height / 2
-    DrawRect(cx, hcy, w, self.header_height, col(c, "header"))
+    DrawRect(cx, hcy, w, self.header_height, drip.colour(c, "header"))
     if focused then
-        DrawRect(cx, hcy - (self.header_height / 2) + 0.001, w, 0.002, col(c, "accent"))
+        DrawRect(cx, hcy - (self.header_height / 2) + 0.001, w, 0.002, drip.colour(c, "accent"))
     end
     if self.active_key ~= self.root then
-        draw_text("<", x + self.pad_x, hcy - 0.0125, self.text_font, self.text_scale, col(c, "accent"))
+        drip.draw_text("<", x + self.pad_x, hcy - 0.0125, self.text_font, self.text_scale, drip.colour(c, "accent"))
     end
-    draw_text(menu.title, cx, hcy - 0.0125, self.header_font, self.header_scale, col(c, "header_text"), nil, nil, nil, true)
+    drip.draw_text(menu.title, cx, hcy - 0.0125, self.header_font, self.header_scale, drip.colour(c, "header_text"), nil, nil, nil, true)
     local cur_y = y + self.header_height + self.pad_y
     for _, layout in ipairs(item_layouts) do
         local item = layout.item
@@ -296,34 +228,34 @@ function Instance:draw(focused)
         local is_sel = focused and idx == menu.index
         local row_cy = cur_y + layout.h / 2
         if item.type == "separator" then
-            DrawRect(cx + 0.001, row_cy, w - self.pad_x * 10, 0.002, col(c, "separator"))
+            DrawRect(cx + 0.001, row_cy, w - self.pad_x * 10, 0.002, drip.colour(c, "separator"))
             if item.label and item.label ~= "" then
-                draw_text(item.label, x + self.pad_x, cur_y + 0.002, self.text_font, 0.24, col(c, "text_dim"))
+                drip.draw_text(item.label, x + self.pad_x, cur_y + 0.002, self.text_font, 0.24, drip.colour(c, "text_dim"))
             end
         else
             if is_sel then
-                DrawRect(cx, row_cy, w, layout.h, col(c, "highlight"))
+                DrawRect(cx, row_cy, w, layout.h, drip.colour(c, "highlight"))
             end
             local tc = is_sel and "text_sel" or "text"
             for li, line in ipairs(layout.lines) do
-                draw_text(line, x + self.pad_x, cur_y + ((li - 1) * self.line_h) - 0.001, self.text_font, self.text_scale, col(c, tc))
+                drip.draw_text(line, x + self.pad_x, cur_y + ((li - 1) * self.line_h) - 0.001, self.text_font, self.text_scale, drip.colour(c, tc))
             end
             local rx = x + w - self.pad_x
             if item.type == "toggle" then
                 local ck = item.value and "toggle_on" or "toggle_off"
-                draw_text(item.value and "ON" or "OFF", rx - 0.0175, cur_y - 0.001, self.text_font, self.text_scale, col(c, ck))
+                drip.draw_text(item.value and "ON" or "OFF", rx - 0.0175, cur_y - 0.001, self.text_font, self.text_scale, drip.colour(c, ck))
             elseif item.type == "slider" then
                 local pct = (item.value - item.min) / (item.max - item.min)
                 local tw = 0.07
                 local tx = rx - tw
-                DrawRect(tx + tw / 2, row_cy, tw, 0.006, col(c, "slider_bg"))
+                DrawRect(tx + tw / 2, row_cy, tw, 0.006, drip.colour(c, "slider_bg"))
                 if pct > 0 then
                     local fw = tw * pct
-                    DrawRect(tx + fw / 2, row_cy, fw, 0.006, col(c, "accent"))
+                    DrawRect(tx + fw / 2, row_cy, fw, 0.006, drip.colour(c, "accent"))
                 end
-                draw_text(tostring(item.value), tx - 0.019, cur_y - 0.001, self.text_font, self.text_scale, col(c, "text"))
+                drip.draw_text(tostring(item.value), tx - 0.019, cur_y - 0.001, self.text_font, self.text_scale, drip.colour(c, "text"))
             elseif item.type == "submenu" then
-                draw_text(">>", rx - 0.012, cur_y - 0.001, self.text_font, self.text_scale, col(c, "accent"))
+                drip.draw_text(">>", rx - 0.012, cur_y - 0.001, self.text_font, self.text_scale, drip.colour(c, "accent"))
             end
         end
         cur_y = cur_y + layout.h
@@ -331,7 +263,7 @@ function Instance:draw(focused)
     if has_desc then
         local dy = y + box_h - desc_h - self.pad_y / 2
         DrawRect(cx, dy + desc_h / 2, w, desc_h + self.pad_y, 0, 0, 0, 120)
-        draw_text(sel.desc, x + 0.008, dy + 0.002, self.text_font, 0.26, col(c, "text_dim"))
+        drip.draw_text(sel.desc, x + 0.008, dy + 0.002, self.text_font, 0.26, drip.colour(c, "text_dim"))
     end
 end
 
@@ -353,40 +285,56 @@ local function start_threads()
     CreateThread(function()
         while _open do
             Wait(0)
-            if is_input_open and is_input_open() then Wait(0) end
-
+            
+            local kb_active = drip.is_keyboard_open and drip.is_keyboard_open()
+            local input_active = drip.is_input_open and drip.is_input_open()
             local inst = _focused and _instances[_focused]
-            if not inst then break end
 
-            DisableControlAction(0, KEY_UP, true)
-            DisableControlAction(0, KEY_DOWN, true)
-            DisableControlAction(0, KEY_LEFT, true)
-            DisableControlAction(0, KEY_RIGHT, true)
-            DisableControlAction(0, KEY_ENTER, true)
-            DisableControlAction(0, KEY_BACK, true)
-            DisableControlAction(0, KEY_TAB, true)
-
-            if IsDisabledControlJustPressed(0, KEY_TAB) then
-                local idx = 1
-                for i, id in ipairs(_order) do
-                    if id == _focused then idx = i break end
+            -- 1. If an overlay is active, set the menu to busy and stay quiet
+            if kb_active or input_active then
+                _busy = true
+            
+            -- 2. If no overlay is active, check if we need to clear the busy buffer
+            else
+                if _busy then
+                    Wait(100) -- Buffer to consume the last frame's input
+                    _busy = false
                 end
-                _focused = _order[(idx % #_order) + 1]
-            elseif IsDisabledControlJustPressed(0, KEY_UP) then
-                inst.active:nav_up(inst.max_vis)
-            elseif IsDisabledControlJustPressed(0, KEY_DOWN) then
-                inst.active:nav_down(inst.max_vis)
-            elseif IsDisabledControlJustPressed(0, KEY_LEFT) then
-                inst.active:adjust_slider(-1)
-            elseif IsDisabledControlJustPressed(0, KEY_RIGHT) then
-                inst.active:adjust_slider(1)
-            elseif IsDisabledControlJustPressed(0, KEY_ENTER) then
-                inst:activate()
-            elseif IsDisabledControlJustPressed(0, KEY_BACK) then
-                if inst.active_key ~= inst.root then
-                    inst:go_to(inst.root)
-                else
-                    inst:close()
+
+                -- 3. Only process menu input if we have an instance and are not busy
+                if inst and not _busy then
+                    -- Standard Menu Controls
+                    DisableControlAction(0, KEY_UP, true)
+                    DisableControlAction(0, KEY_DOWN, true)
+                    DisableControlAction(0, KEY_LEFT, true)
+                    DisableControlAction(0, KEY_RIGHT, true)
+                    DisableControlAction(0, KEY_ENTER, true)
+                    DisableControlAction(0, KEY_BACK, true)
+                    DisableControlAction(0, KEY_TAB, true)
+
+                    if IsDisabledControlJustPressed(0, KEY_TAB) then
+                        local idx = 1
+                        for i, id in ipairs(_order) do
+                            if id == _focused then idx = i break end
+                        end
+                        _focused = _order[(idx % #_order) + 1]
+                    elseif IsDisabledControlJustPressed(0, KEY_UP) then
+                        inst.active:nav_up(inst.max_vis)
+                    elseif IsDisabledControlJustPressed(0, KEY_DOWN) then
+                        inst.active:nav_down(inst.max_vis)
+                    elseif IsDisabledControlJustPressed(0, KEY_LEFT) then
+                        inst.active:adjust_slider(-1)
+                    elseif IsDisabledControlJustPressed(0, KEY_RIGHT) then
+                        inst.active:adjust_slider(1)
+                    elseif IsDisabledControlJustPressed(0, KEY_ENTER) then
+                        inst:activate()
+                    elseif IsDisabledControlJustPressed(0, KEY_BACK) then
+                        if inst.active_key ~= inst.root then
+                            inst:go_to(inst.root)
+                        else
+                            inst:close()
+                        end
+                    end
                 end
             end
         end
@@ -395,7 +343,7 @@ end
 
 --- @section API
 
-local function open_menu(data)
+function drip.open_menu(data)
     if not data.id then return end
     local inst = Instance.new(data)
     _instances[data.id] = inst
@@ -407,10 +355,7 @@ local function open_menu(data)
     end
 end
 
-exports("open_menu", open_menu)
-if drip then drip.open_menu = open_menu end
-
-local function close_menu(id)
+function drip.close_menu(id)
     if id then
         local inst = _instances[id]
         if inst then inst:close() end
@@ -422,10 +367,7 @@ local function close_menu(id)
     end
 end
 
-exports("close_menu", close_menu)
-if drip then drip.close_menu = close_menu end
-
-local function update_menu(id, menu_key, data)
+function drip.update_menu(id, menu_key, data)
     local inst = _instances[id]
     if not inst then return end
     if not inst.menus[menu_key] then return end
@@ -438,10 +380,7 @@ local function update_menu(id, menu_key, data)
     end
 end
 
-exports("update_menu", update_menu)
-if drip then drip.update_menu = update_menu end
-
-function update_menus(id, menus)
+function drip.update_menus(id, menus)
     local inst = _instances[id]
     if not inst then return end
     for key, menu in pairs(menus) do
@@ -455,119 +394,7 @@ function update_menus(id, menus)
     end
 end
 
-exports("update_menus", update_menus)
-if drip then drip.update_menus = update_menus end
-
-function is_menu_open(id)
+function drip.is_menu_open(id)
     if id then return _instances[id] ~= nil end
     return _open
 end
-
-exports("is_menu_open", is_menu_open)
-if drip then drip.is_menu_open = is_menu_open end
-
---- @section Test Command
-
-RegisterCommand("drip:menu", function()
-    if is_menu_open() then close_menu() return end
-
-    open_menu({
-        id = "main",
-        root = "menu_1",
-        style = {x = 0.015, y = 0.0275, width = 0.22},
-        menus = {
-            menu_1 = {
-                title = "Main Menu",
-                items = {
-                    {
-                        type = "action",
-                        label = "Item 1",
-                        desc = "Can trigger a function.",
-                        on_action = function() print("item 1 did a thing") end
-                    },
-                    {
-                        type = "toggle",
-                        label = "Item 2",
-                        value = false,
-                        desc = "Flips on and off.",
-                        on_change = function(v) print("item 2 did a thing") end
-                    },
-                    {
-                        type = "slider",
-                        label = "Item 3",
-                        min = 1, max = 10, value = 1, step = 1,
-                        desc = "Move a slider.",
-                    },
-                    {type = "submenu", label = "Submenu 1", desc = "Open submenu 1.", submenu = "menu_2"},
-                    {type = "separator"},
-                    {type = "close", label = "Close", desc = "Close the menu."},
-                }
-            },
-            menu_2 = {
-                title = "Submenu 1",
-                items = {
-                    {type = "submenu", label = "Submenu 2", desc = "Open submenu 2.", submenu = "menu_3"},
-                    {type = "submenu", label = "Submenu 3", desc = "Open submenu 3.", submenu = "menu_4"},
-                    {type = "separator"},
-                    {type = "back", key = "menu_1", label = "Back", desc = "Return to main menu."},
-                }
-            },
-            menu_3 = {
-                title = "Submenu 2",
-                items = {
-                    {
-                        type = "slider",
-                        label = "Item 1",
-                        min = 0, max = 100, value = 80, step = 5,
-                        desc = "Adjust a value.",
-                        on_change = function(v) print("slider", v) end
-                    },
-                    {type = "separator"},
-                    {type = "back", key = "menu_2", label = "Back", desc = "Return to submenu 1."},
-                }
-            },
-            menu_4 = {
-                title = "Submenu 3",
-                items = {
-                    {
-                        type = "toggle",
-                        label = "Item 1",
-                        value = false,
-                        desc = "Flips on and off.",
-                        on_change = function(v) print("toggle", v) end
-                    },
-                    {type = "separator"},
-                    {type = "back", key = "menu_2", label = "Back", desc = "Return to submenu 1."},
-                }
-            },
-        }
-    })
-
-    open_menu({
-        id = "secondary",
-        root = "menu_1",
-        style = {x = 0.260, y = 0.0275, width = 0.22},
-        menus = {
-            menu_1 = {
-                title = "Secondary Menu",
-                items = {
-                    {
-                        type = "action",
-                        label = "Item A",
-                        desc = "Does something else.",
-                        on_action = function() print("item A did a thing") end
-                    },
-                    {
-                        type = "toggle",
-                        label = "Item B",
-                        value = false,
-                        desc = "Another toggle.",
-                        on_change = function(v) print("item B toggled", v) end
-                    },
-                    {type = "separator"},
-                    {type = "close", label = "Close", desc = "Close this menu."},
-                }
-            },
-        }
-    })
-end, false)

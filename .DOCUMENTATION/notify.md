@@ -9,12 +9,10 @@ Queued notification component. Supports four types, optional style overrides, an
 ### `notify(data)`
 Push a notification onto the queue.
 
-### `exports["resource_name"]:notify(data)`
-Call from another resource.
 
 ### Net Event
 ```lua
-TriggerClientEvent("resource_name:notify", source, data)
+TriggerClientEvent("drip:cl:notify", source, data)
 ```
 
 ---

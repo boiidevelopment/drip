@@ -20,13 +20,13 @@ All components share the same patterns - identical helpers, `style = {}` overrid
 
 ### Option A - Standalone Resource
 
-Drop the `drip` folder into your resources, `ensure drip` in `server.cfg`, then call via exports from any resource:
+Drop the `drip` folder into your resources, `ensure drip` in `server.cfg`, then fetch the API:
 
 ```lua
-exports.drip:send_notification({header = "Info", type = "info", message = "Hello.", duration = 3000})
-exports.drip:open_menu({id = "main", root = "menu_1", menus = {...}})
-exports.drip:show_panel({id = "hud", title = "Status", lines = {...}})
-exports.drip:open_input({title = "Give Item", inputs = {...}})
+local drip = exports.drip:api()
+
+drip.open_menu({id = "main", root = "menu_1", menus = {...}})
+-- etc
 ```
 
 ---
@@ -44,29 +44,8 @@ client_scripts {
 Functions are then available directly in your resource scope via the `drip` namespace:
 
 ```lua
-drip.send_notification({header = "Info", type = "info", message = "Hello.", duration = 3000})
 drip.open_menu({id = "main", root = "menu_1", menus = {...}})
-drip.show_panel({id = "hud", title = "Status", lines = {...}})
-drip.open_input({title = "Give Item", inputs = {...}})
-```
-
----
-
-### Option C - Single File
-
-Take only the component you need, drop it into your resource, and call the functions directly:
-
-```lua
--- fxmanifest.lua
-client_scripts {
-    "notify.lua",
-    "my_script.lua"
-}
-```
-
-```lua
--- my_script.lua
-send_notification({header = "Success", type = "success", message = "Done.", duration = 3000})
+-- etc
 ```
 
 No extra setup. No dependencies. It just works.

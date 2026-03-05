@@ -12,13 +12,6 @@ Data-driven multi-field input panel. Centred on screen by default. Confirms or c
 | `close_input()` | Close the input panel |
 | `is_input_open()` | Returns `true` if open |
 
-### Exports
-```lua
-exports["resource_name"]:open_input(data)
-exports["resource_name"]:close_input()
-exports["resource_name"]:is_input_open()
-```
-
 ---
 
 ## Parameters

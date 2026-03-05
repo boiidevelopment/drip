@@ -17,7 +17,7 @@ fx_version "cerulean"
 games { "gta5", "rdr3" }
 
 name "drip"
-version "1.0.1"
+version "1.1.0"
 description "A drawn interface pack for CFX platforms."
 author "Case"
 repository "https://github.com/boiidevelopment/drip"
@@ -25,5 +25,6 @@ lua54 "yes"
 
 client_scripts {
     "drip/init.lua",
-    "drip/components/*.lua"
+    "drip/components/*.lua",
+    "drip/test.lua"
 }
